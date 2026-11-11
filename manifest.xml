@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Outlook Web-Link – Add-in-Manifest
+  Gehostet per GitHub Pages: https://saddlerurosboros.github.io/outlook-weblink-addin
+  Bei Änderungen <Version> erhöhen und das Add-in neu hinzufügen.
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+           xsi:type="MailApp">
+  <Id>49261295-5ad5-46ed-a26b-1777da03c689</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Privat</ProviderName>
+  <DefaultLocale>de-DE</DefaultLocale>
+  <DisplayName DefaultValue="Web-Link"/>
+  <Description DefaultValue="Erzeugt einen Outlook-im-Web-Link zur geöffneten Mail oder zum geöffneten Termin."/>
+  <IconUrl DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/taskpane.html"/>
+  <AppDomains>
+    <AppDomain>https://saddlerurosboros.github.io/outlook-weblink-addin</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.3"/>
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/taskpane.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.3">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <!-- Mail lesen -->
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="weblinkMsgGroup">
+                  <Label resid="groupLabel"/>
+                  <Control xsi:type="Button" id="weblinkMsgButton">
+                    <Label resid="buttonLabel"/>
+                    <Supertip>
+                      <Title resid="buttonLabel"/>
+                      <Description resid="buttonTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskpaneUrl"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+            <!-- Termin als Teilnehmer -->
+            <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="weblinkAttGroup">
+                  <Label resid="groupLabel"/>
+                  <Control xsi:type="Button" id="weblinkAttButton">
+                    <Label resid="buttonLabel"/>
+                    <Supertip>
+                      <Title resid="buttonLabel"/>
+                      <Description resid="buttonTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskpaneUrl"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+            <!-- Eigener Termin (Organisator) -->
+            <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="weblinkOrgGroup">
+                  <Label resid="groupLabel"/>
+                  <Control xsi:type="Button" id="weblinkOrgButton">
+                    <Label resid="buttonLabel"/>
+                    <Supertip>
+                      <Title resid="buttonLabel"/>
+                      <Description resid="buttonTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskpaneUrl"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="icon16" DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/assets/icon-16.png"/>
+          <bt:Image id="icon32" DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/assets/icon-32.png"/>
+          <bt:Image id="icon80" DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/assets/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="taskpaneUrl" DefaultValue="https://saddlerurosboros.github.io/outlook-weblink-addin/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="groupLabel" DefaultValue="Web-Link"/>
+          <bt:String id="buttonLabel" DefaultValue="Web-Link"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="buttonTip" DefaultValue="Link zu diesem Element in Outlook im Web erzeugen und kopieren."/>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>

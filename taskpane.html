@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web-Link</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f2f5f8;
+    --text: #1b2733;
+    --muted: #5b6b7a;
+    --accent: #165c96;
+    --accent-text: #ffffff;
+    --line: #d5dde5;
+    --ok: #1d7a46;
+    --err: #b3261e;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1f2328;
+      --surface: #2a3038;
+      --text: #e6ebf0;
+      --muted: #9aa8b5;
+      --accent: #5aa4e0;
+      --accent-text: #0e1a24;
+      --line: #3a424c;
+      --ok: #6fcf97;
+      --err: #f28b82;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  .kind { color: var(--muted); font-size: 12px; margin: 0 0 2px; }
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 14px;
+    overflow-wrap: anywhere;
+  }
+  .link {
+    display: block;
+    width: 100%;
+    min-height: 88px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+    resize: vertical;
+    word-break: break-all;
+  }
+  .actions { display: grid; gap: 8px; margin-top: 12px; }
+  button {
+    font: inherit;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:focus-visible, select:focus-visible, .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { min-height: 1.45em; margin: 10px 0 0; font-size: 13px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 10px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  label { display: block; font-size: 13px; margin: 10px 0 4px; }
+  select {
+    width: 100%;
+    font: inherit;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+  <p class="kind" id="kind">Wird geladen …</p>
+  <h1 id="subject"></h1>
+
+  <textarea class="link" id="link" readonly aria-label="Web-Link"></textarea>
+
+  <div class="actions">
+    <button class="primary" id="copy" disabled>Link kopieren</button>
+    <button id="copyMd" disabled>Als Markdown-Link kopieren</button>
+    <button id="open" disabled>In Outlook im Web öffnen</button>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+
+  <details>
+    <summary>Einstellungen</summary>
+    <label for="format">Link-Format</label>
+    <select id="format">
+      <option value="owa">Klassisch (wie Microsoft Graph „webLink“)</option>
+      <option value="modern">Modern (/mail/deeplink, /calendar/item)</option>
+    </select>
+    <label for="host">Adresse</label>
+    <select id="host">
+      <option value="https://outlook.office.com">outlook.office.com</option>
+      <option value="https://outlook.office365.com">outlook.office365.com</option>
+      <option value="https://outlook.cloud.microsoft">outlook.cloud.microsoft</option>
+    </select>
+    <p class="hint">Falls ein Link nicht öffnet, das andere Format probieren. Die Auswahl wird gespeichert.</p>
+  </details>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let current = { url: "", subject: "" };
+
+  // ---------- Einstellungen (roamingSettings = geräteübergreifend) ----------
+  function getSetting(key, fallback) {
+    try {
+      const v = Office.context.roamingSettings.get(key);
+      return v == null ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+  function setSetting(key, value) {
+    try {
+      Office.context.roamingSettings.set(key, value);
+      Office.context.roamingSettings.saveAsync();
+    } catch (e) { /* ohne Speicherung weitermachen */ }
+  }
+
+  // ---------- Hilfsfunktionen ----------
+  function setStatus(text, kind) {
+    const el = $("status");
+    el.textContent = text || "";
+    el.className = "status" + (kind ? " " + kind : "");
+  }
+  function setEnabled(on) {
+    ["copy", "copyMd", "open"].forEach((id) => { $(id).disabled = !on; });
+  }
+
+  function isAppointment(item) {
+    return item.itemType === Office.MailboxEnums.ItemType.Appointment;
+  }
+
+  // EWS-ID des Elements holen. Im Lesemodus steht sie direkt in itemId,
+  // als Organisator eines eigenen Termins nur über getItemIdAsync (ab 1.8).
+  function getEwsId(item) {
+    return new Promise((resolve, reject) => {
+      if (item.itemId) return resolve(item.itemId);
+      if (typeof item.getItemIdAsync === "function") {
+        item.getItemIdAsync((r) => {
+          if (r.status === Office.AsyncResultStatus.Succeeded && r.value) resolve(r.value);
+          else reject(new Error("Dieses Element ist noch nicht gespeichert. Erst speichern bzw. senden, dann erneut versuchen."));
+        });
+      } else {
+        reject(new Error("Für dieses Element liefert Outlook keine ID."));
+      }
+    });
+  }
+
+  function getSubject(item) {
+    return new Promise((resolve) => {
+      const s = item.subject;
+      if (typeof s === "string") return resolve(s);
+      if (s && typeof s.getAsync === "function") {
+        s.getAsync((r) => resolve(r.status === Office.AsyncResultStatus.Succeeded ? (r.value || "") : ""));
+      } else {
+        resolve("");
+      }
+    });
+  }
+
+  function toRestId(ewsId) {
+    const mb = Office.context.mailbox;
+    if (typeof mb.convertToRestId === "function") {
+      try { return mb.convertToRestId(ewsId, Office.MailboxEnums.RestVersion.v2_0); } catch (e) { /* Fallback unten */ }
+    }
+    return ewsId.replace(/\//g, "-").replace(/\+/g, "_");
+  }
+
+  function buildUrl(restId, appointment, format, host) {
+    const id = encodeURIComponent(restId);
+    if (format === "modern") {
+      return appointment
+        ? `${host}/calendar/item/${id}`
+        : `${host}/mail/deeplink/read/${id}`;
+    }
+    return appointment
+      ? `${host}/owa/?itemid=${id}&exvsurl=1&path=/calendar/item`
+      : `${host}/owa/?ItemID=${id}&exvsurl=1&viewmodel=ReadMessageItem`;
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* Fallback */ }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function escapeMd(text) {
+    return (text || "Outlook-Element").replace(/([\[\]])/g, "\\$1");
+  }
+
+  // ---------- Hauptlogik ----------
+  async function render() {
+    setEnabled(false);
+    setStatus("");
+    const item = Office.context.mailbox.item;
+    if (!item) {
+      $("kind").textContent = "Kein Element geöffnet";
+      $("subject").textContent = "";
+      $("link").value = "";
+      setStatus("Eine Mail oder einen Termin auswählen.", "");
+      return;
+    }
+
+    const appointment = isAppointment(item);
+    $("kind").textContent = appointment ? "Termin" : "Mail";
+
+    try {
+      const [ewsId, subject] = await Promise.all([getEwsId(item), getSubject(item)]);
+      const url = buildUrl(toRestId(ewsId), appointment, $("format").value, $("host").value);
+      current = { url, subject };
+      $("subject").textContent = subject || "(ohne Betreff)";
+      $("link").value = url;
+      setEnabled(true);
+    } catch (err) {
+      $("subject").textContent = "";
+      $("link").value = "";
+      setStatus(err.message, "err");
+    }
+  }
+
+  Office.onReady(() => {
+    $("format").value = getSetting("format", "owa");
+    $("host").value = getSetting("host", "https://outlook.office.com");
+
+    $("format").addEventListener("change", (e) => { setSetting("format", e.target.value); render(); });
+    $("host").addEventListener("change", (e) => { setSetting("host", e.target.value); render(); });
+
+    $("copy").addEventListener("click", async () => {
+      const ok = await copyText(current.url);
+      setStatus(ok ? "Link kopiert." : "Kopieren nicht möglich – Link im Feld markieren und mit ⌘C kopieren.", ok ? "ok" : "err");
+    });
+    $("copyMd").addEventListener("click", async () => {
+      const md = `[${escapeMd(current.subject)}](${current.url})`;
+      const ok = await copyText(md);
+      setStatus(ok ? "Markdown-Link kopiert." : "Kopieren nicht möglich – Link im Feld markieren und mit ⌘C kopieren.", ok ? "ok" : "err");
+    });
+    $("open").addEventListener("click", () => {
+      try { Office.context.ui.openBrowserWindow(current.url); }
+      catch (e) { window.open(current.url, "_blank"); }
+    });
+    $("link").addEventListener("focus", (e) => e.target.select());
+
+    // Angeheftetes Taskpane: beim Wechsel des Elements neu berechnen
+    try {
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, render);
+    } catch (e) { /* ältere Requirement Sets */ }
+
+    render();
+  });
+})();
+</script>
+</body>
+</html>
